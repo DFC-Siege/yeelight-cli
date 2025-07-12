@@ -196,17 +196,31 @@ macro_rules! sel_bg {
 
 #[tokio::main]
 async fn main() {
-    let mut opt = Options::from_args();
-
+    let opt = Options::from_args();
     let mut predefined_devices: HashMap<String, String> = HashMap::new();
     predefined_devices.insert("wall".to_string(), "192.168.1.87".to_string());
     predefined_devices.insert("face".to_string(), "192.168.1.89".to_string());
     predefined_devices.insert("bed".to_string(), "192.168.1.90".to_string());
 
-    if let Some(device) = predefined_devices.iter().find(|d| d.0 == &opt.address) {
-        opt.address = device.1.clone();
+    if opt.address == "all" {
+        for device in predefined_devices {
+            let mut new_opt = Options::from_args();
+            new_opt.address = device.1.clone();
+            run(new_opt).await;
+        }
+    } else {
+        let mut final_opt = opt;
+        if let Some(device) = predefined_devices
+            .iter()
+            .find(|d| d.0 == &final_opt.address)
+        {
+            final_opt.address = device.1.clone();
+        }
+        run(final_opt).await;
     }
+}
 
+async fn run(opt: Options) {
     let mut bulb = yeelight::Bulb::connect(&opt.address, opt.port)
         .await
         .unwrap();
