@@ -1,5 +1,7 @@
 mod presets;
 
+use std::collections::HashMap;
+
 use structopt::{
     clap::{AppSettings, ArgGroup},
     StructOpt,
@@ -194,7 +196,16 @@ macro_rules! sel_bg {
 
 #[tokio::main]
 async fn main() {
-    let opt = Options::from_args();
+    let mut opt = Options::from_args();
+
+    let mut predefined_devices: HashMap<String, String> = HashMap::new();
+    predefined_devices.insert("wall".to_string(), "192.168.1.87".to_string());
+    predefined_devices.insert("face".to_string(), "192.168.1.89".to_string());
+    predefined_devices.insert("bed".to_string(), "192.168.1.90".to_string());
+
+    if let Some(device) = predefined_devices.iter().find(|d| d.0 == &opt.address) {
+        opt.address = device.1.clone();
+    }
 
     let mut bulb = yeelight::Bulb::connect(&opt.address, opt.port)
         .await
@@ -231,7 +242,7 @@ async fn main() {
             Prop::RGB { rgb_value, bg} => sel_bg!(bulb.set_rgb(rgb_value, effect, duration) || bg_set_rgb if bg),
             Prop::HSV { hue, sat, bg} => sel_bg!(bulb.set_hsv(hue, sat, effect, duration) || bg_set_hsv if bg),
             Prop::Bright { brightness, bg} => sel_bg!(bulb.set_bright(brightness, effect, duration) || bg_set_bright if bg),
-            Prop::Name { name } => bulb.set_name(yeelight::QuotedString(name)).await,
+            Prop::Name { name } => bulb.set_name(name.as_str()).await,
             Prop::Scene {
                 class,
                 val1,
@@ -263,9 +274,9 @@ async fn main() {
             yeelight::Prop::CT => sel_bg!(bulb.adjust_ct(percent, duration) || bg_adjust_ct if bg),
         },
         Command::MusicConnect { host, port } => {
-            bulb.set_music(yeelight::MusicAction::On, yeelight::QuotedString(host), port).await
+            bulb.set_music(yeelight::MusicAction::On, host.as_str(), port).await
         }
-        Command::MusicStop => bulb.set_music(yeelight::MusicAction::Off, yeelight::QuotedString("".to_string()), 0).await,
+        Command::MusicStop => bulb.set_music(yeelight::MusicAction::Off, "", 0).await,
         Command::Preset{ preset } => presets::apply(bulb, preset).await,
         Command::Listen => {
             let (sender, mut recv) = mpsc::channel(10);
